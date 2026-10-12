@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>infrawatch</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d1117; --surface: #161b22; --border: #21262d;
+      --green: #3fb950; --text: #e6edf3; --muted: #7d8590;
+      --red: #f85149; --yellow: #d29922;
+      --font-mono: 'JetBrains Mono', monospace;
+      --font-ui: 'Inter', sans-serif;
+    }
+    body { background: var(--bg); color: var(--text); font-family: var(--font-ui); min-height: 100vh; padding: 24px; }
+    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+    .logo { font-family: var(--font-mono); font-size: 1.1rem; font-weight: 600; letter-spacing: -0.02em; }
+    .logo span { color: var(--green); }
+    .status { display: flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; }
+    .card-label { font-family: var(--font-mono); font-size: 0.7rem; color: var(--muted); margin-bottom: 10px; }
+    .card-value { font-family: var(--font-mono); font-size: 2.4rem; font-weight: 600; line-height: 1; margin-bottom: 12px; transition: color 0.3s; }
+    .bar-track { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease, background 0.3s; }
+    .card-sub { font-size: 0.75rem; color: var(--muted); margin-top: 8px; font-family: var(--font-mono); }
+    .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin-bottom: 12px; }
+    .chart-card .card-label { margin-bottom: 16px; }
+    .chart-wrap { height: 160px; }
+    .proc-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; }
+    .proc-card .card-label { margin-bottom: 14px; }
+    .proc-row { display: grid; grid-template-columns: 1fr 80px 80px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-family: var(--font-mono); font-size: 0.8rem; }
+    .proc-row:last-child { border-bottom: none; }
+    .proc-name { color: var(--text); }
+    .proc-num { color: var(--muted); text-align: right; }
+    .proc-cpu-bar { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+    .mini-bar { width: 40px; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    .mini-fill { height: 100%; background: var(--green); border-radius: 2px; transition: width 0.6s ease; }
+    .ok { color: var(--green); } .warn { color: var(--yellow); } .danger { color: var(--red); }
+    .bar-ok { background: var(--green); } .bar-warn { background: var(--yellow); } .bar-danger { background: var(--red); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">infra<span>watch</span></div>
+    <div class="status"><div class="dot"></div><span id="last-updated">connecting...</span></div>
+  </header>
+  <div class="metrics">
+    <div class="card">
+      <div class="card-label">cpu usage</div>
+      <div class="card-value" id="cpu-value">—</div>
+      <div class="bar-track"><div class="bar-fill" id="cpu-bar"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-label">memory</div>
+      <div class="card-value" id="mem-value">—</div>
+      <div class="bar-track"><div class="bar-fill" id="mem-bar"></div></div>
+      <div class="card-sub" id="mem-sub"></div>
+    </div>
+    <div class="card">
+      <div class="card-label">disk</div>
+      <div class="card-value" id="disk-value">—</div>
+      <div class="bar-track"><div class="bar-fill" id="disk-bar"></div></div>
+      <div class="card-sub" id="disk-sub"></div>
+    </div>
+  </div>
+  <div class="chart-card">
+    <div class="card-label">cpu history · last 60 seconds</div>
+    <div class="chart-wrap"><canvas id="cpu-chart"></canvas></div>
+  </div>
+  <div class="proc-card">
+    <div class="card-label">top processes</div>
+    <div id="proc-list"></div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
