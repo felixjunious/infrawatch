@@ -1,4 +1,4 @@
-const API = 'http://localhost:8080'
+const API = 'http://localhost:8080/api'
 const INTERVAL = 5000
 const HISTORY_MAX = 12
 

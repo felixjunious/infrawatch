@@ -3,11 +3,15 @@ import json
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+BASE_DIR = Path(__file__).parent.parent
+COLLECTORS_DIR = BASE_DIR / "collectors"
 
 app = FastAPI()
 
@@ -17,10 +21,6 @@ app.add_middleware(
     allow_methods=["GET"],
     allow_headers=["*"],
 )
-
-BASE_DIR = Path(__file__).parent.parent
-COLLECTORS_DIR = BASE_DIR / "collectors"
-
 
 class CPUMetrics(BaseModel):
     cpu_percent: float
@@ -64,28 +64,26 @@ async def run_collector(name: str) -> dict:
         logger.error(f"{name} collector timed out")
         raise HTTPException(status_code=500, detail=f"{name} timed out")
 
-@app.get("/")
-async def root():
-    return {"status": "infrawatch running"}
-
-@app.get("/health")
+@app.get("/api/health")
 async def health():
     return {"status": "ok"}
 
-@app.get("/cpu", response_model=CPUMetrics)
+@app.get("/api/cpu", response_model=CPUMetrics)
 async def get_cpu():
     return await run_collector("cpu")
 
-@app.get("/memory", response_model=MemoryMetrics)
+@app.get("/api/memory", response_model=MemoryMetrics)
 async def get_memory():
     return await run_collector("memory")
 
-@app.get("/disk", response_model=DiskMetrics)
+@app.get("/api/disk", response_model=DiskMetrics)
 async def get_disk():
     return await run_collector("disk")
 
-@app.get("/processes", response_model=list[ProcessInfo])
+@app.get("/api/processes", response_model=list[ProcessInfo])
 async def get_processes():
     return await run_collector("processes")
 
 
+
+app.mount("/", StaticFiles(directory=str(BASE_DIR / "frontend"), html=True), name="frontend")
