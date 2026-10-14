@@ -1,51 +1,91 @@
 import subprocess
 import json
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],
+    allow_methods=["GET"],
     allow_headers=["*"],
 )
 
+BASE_DIR = Path(__file__).parent.parent
+COLLECTORS_DIR = BASE_DIR / "collectors"
+
+
+class CPUMetrics(BaseModel):
+    cpu_percent: float
+
+class DiskMetrics(BaseModel):
+    total_gb: int
+    used_gb: int
+    percent: float
+
+class MemoryMetrics(BaseModel):
+    total_mb: int
+    used_mb: int
+    percent: float
+
+class ProcessInfo(BaseModel):
+    pid: int
+    name: str
+    cpu:float
+    mem: float
+
+
+async def run_collector(name: str) -> dict:
+    
+    script = COLLECTORS_DIR / f"{name}.sh"
+
+    try:
+        result = subprocess.run(
+            [script], capture_output=True, text=True, timeout=5
+        )
+
+        if result.returncode != 0:
+            logger.error(f"{name} collector failed: {result.stderr}")
+            raise HTTPException(status_code=500, detail=f"{name} collector failed")
+        return json.loads(result.stdout)
+
+    except json.JSONDecodeError as e:
+        logger.error(f"{name} returned invalid JSON: {e}")
+        raise HTTPException(status_code=500, detail=f"{name} returned invalid JSON")
+
+    except subprocess.TimeoutExpired:
+        logger.error(f"{name} collector timed out")
+        raise HTTPException(status_code=500, detail=f"{name} timed out")
+
 @app.get("/")
-def root():
+async def root():
     return {"status": "infrawatch running"}
 
-@app.get("/cpu")
-def get_cpu_data():
-    return _get_collector_data("cpu")
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
-@app.get("/disk")
-def get_disk_data():
-    return _get_collector_data("disk")
+@app.get("/cpu", response_model=CPUMetrics)
+async def get_cpu():
+    return await run_collector("cpu")
 
-@app.get("/memory")
-def get_memory_data():
-    return _get_collector_data("memory")
+@app.get("/memory", response_model=MemoryMetrics)
+async def get_memory():
+    return await run_collector("memory")
 
-@app.get("/processes")
-def get_processes_data():
-    return _get_collector_data("processes")
+@app.get("/disk", response_model=DiskMetrics)
+async def get_disk():
+    return await run_collector("disk")
+
+@app.get("/processes", response_model=list[ProcessInfo])
+async def get_processes():
+    return await run_collector("processes")
 
 
-def _get_collector_data(collector: str=None):
-    if not collector:
-        return {}
-
-    result = subprocess.run(
-        [f"./collectors/{collector}.sh"],
-        capture_output=True,
-        text=True
-    )
-
-    if result.returncode != 0:
-        return  {"error": f"{collector} collector failed"}
-
-    data = json.loads(result.stdout)
-    return data
